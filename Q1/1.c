@@ -48,5 +48,9 @@ int main()
         }
     }
    }
+   //liberando memoria
+   for(int a = 0; a < file_number; a++){free(nomes[a]);} 
+   free(nomes);
+   free(threads);
    pthread_exit(NULL);
 }
