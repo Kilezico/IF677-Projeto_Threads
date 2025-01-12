@@ -10,9 +10,9 @@ void* Procurar(void* search){
 FILE* file; //criando variavel para leitura do arquivo
 file = fopen((char*) search, "r"); 
 int f = 0, i = 0, cond = 0; //f representa a linha atual do arquivo, i representa o indice da palavra, cond representa uma flag para analisar se as letras sao iguais 
-char frase[200]; //variavel para ler as frases de cada linha do arquivo txt
+char frase[500]; //variavel para ler as frases de cada linha do arquivo txt
     
-while(fgets(frase, 200, file) != NULL){ //loop para coletar as linhas do arquivo
+while(fgets(frase, 500, file) != NULL){ //loop para coletar as linhas do arquivo
  f++; //a linha atual e atualizada
  for(int c = 0; c < strlen(frase); c++){ //loop para chegar ate o final da linha passando letra por letra
       if(frase[c] == palavra[i]){cond = 1;} else{cond = 0;} //se as letras forem iguais, a condicao e 1
