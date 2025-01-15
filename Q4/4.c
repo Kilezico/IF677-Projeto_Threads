@@ -7,6 +7,7 @@
 #define C 1    // Qtd. de threads consumidoras
 #define B 10    // Tamanho do Buffer da BlockingQueue
 
+// Structs
 typedef struct elem{
     int value;
     struct elem *prox;
@@ -22,6 +23,7 @@ typedef struct thread_args {
     BlockingQueue *queue;
 } ThreadArgs;
 
+// Funções
 BlockingQueue *newBlockingQueue(unsigned int SizeBuffer);
 void putBlockingQueue(BlockingQueue *Q, int newValue, int id);
 int takeBlockingQueue(BlockingQueue *Q, int id);
@@ -35,13 +37,13 @@ void *consumidor(void *args);
 
 int main()
 {
-    // Cria a fila
+    // Cria a fila de tamanho B
     BlockingQueue *bQueue = newBlockingQueue(B);
     // Cria as threads
     pthread_t produtores[P];
     pthread_t consumidores[C];
     for (int i=1; i<=P; i++) {
-        // Aloca memória para os argumentos (struct porque temos mais de um argumento)
+        // Aloca memória para o argumento (que é uma struct porque temos mais de um argumento)
         ThreadArgs *args = (ThreadArgs *) malloc(sizeof(ThreadArgs));
         args->id = i; args->queue = bQueue;
         pthread_create(&produtores[i], NULL, produtor, (void *) args);
