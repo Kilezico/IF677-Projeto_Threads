@@ -66,7 +66,9 @@ int main()
     }
     printf("Li a matriz.\n");
 
-    // Cria threads
+    // Cria 3 threads: Uma para checar linhas, uma pra coluans e uma pras diagonais, de modo que
+    // não ocorra condição de disputa, pois elas estão apenas lendo da matriz e cada uma está 
+    // checando coisas diferentes.
     pthread_t linha, coluna, diagonal;
     int res_linha=0, res_coluna=0, res_diagonal=0;
     // Envia o endereço de variáveis contadoras para poder usá-las na verificação
