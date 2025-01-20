@@ -56,9 +56,9 @@ void SairPonte(int direcao) {
 
 void* CarroNorte(void* arg) {
     printf("Carro vindo do norte esta em espera\n");
-    entrar_ponte(1);
+    EntrarPonte(1);
     printf("Carro do norte entrou na ponte \n");
-    sair_ponte(1);
+    SairPonte(1);
     printf("Carro do norte saiu da ponte.\n");
     pthread_exit(NULL);
 }
@@ -66,9 +66,9 @@ void* CarroNorte(void* arg) {
 
 void* CarroSul(void* arg) {
     printf("Carro vindo do sul esta em espera\n");
-    entrar_ponte(2);
+    EntrarPonte(2);
     printf("Carro do sul entrou na ponte.\n");
-    sair_ponte(2);
+    SairPonte(2);
     printf("Carro do sul saiu da ponte.\n");
     pthread_exit(NULL);
 }
@@ -93,8 +93,8 @@ int main() {
     }
 
     for (int i = 0; i < N; i++) {
-        pthread_join(threads_Norte[i], NULL);
-        pthread_join(threads_Sul[i], NULL);
+        pthread_join(threads_norte[i], NULL);
+        pthread_join(threads_sul[i], NULL);
     }
 
     pthread_mutex_destroy(&ponte_mutex);
