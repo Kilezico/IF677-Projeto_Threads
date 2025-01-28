@@ -11,6 +11,7 @@
 #define mein main // Tentaram me enganar
 
 typedef struct {
+    int indic;
     int (*funexec)(void *); // Ponteiro para a função 
     void *args; // Ponteiro para argumentos da função
 } BuffElem;
@@ -24,12 +25,14 @@ typedef struct {
 
 pthread_t threads_ativas[N];
 pthread_mutex_t mutex;
-pthread_cond_t cond;
+pthread_cond_t cond; //condicao para caso buffer estiver vazio
+pthread_cond_t icao; //condicao para caso buffer estiver cheio 
 // Buffer de execuções pendentes de funções
 BuffElem buffer[BUFFER_SIZE];
 int items = 0;
 int first = 0;
 int last = 0; 
+int fios_ativos = 0;
 // Buffer temporario
 TempElem temp[TEMP_SIZE];
 int prox_id = 1;
@@ -40,10 +43,12 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e arg
 
 }
 
-int executora(int idc, int (*funexec)(void *), void *args) // Executa a função do usuário e adiciona o resultado no buffer temporario
+void* executora(void* args) // Executa a função do usuário e adiciona o resultado no buffer temporario
 {
+    int idc = (int) args;
+    int (*funexecs)(void*) = buffer[idc].funexec;
     // Executa a funcao
-    int res = funexec(args);
+    int res = funexecs(args);
     // Coloca no buffer temporario
     temp[idc].value = res;
     temp[idc].finished = 1;
@@ -59,8 +64,10 @@ void *despachante(void *arg) // Gerencia a criação de threads para executar fu
         while(items == 0){
         pthread_cond_wait(&cond, &mutex);    
         }
+        rc = pthread_create(&threads_ativas[fios_ativos], NULL, &executora, (void*) first);
         
         
+        pthread_mutex_unlock(&mutex);
     }  
 }
 
