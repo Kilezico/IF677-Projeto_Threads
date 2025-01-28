@@ -33,7 +33,7 @@ TempElem temp[TEMP_SIZE];
 int prox_id = 1;
 
 // Funções
-int agendarExecucao(void *(*funexec)(void *), void *args) // Recebe função e argumentos e retorna ID para depois receber resultado
+int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e argumentos e retorna ID para depois receber resultado
 {
 
 }
