@@ -1,6 +1,3 @@
-/*
---- API ---
-*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -8,7 +5,7 @@
 #define N 8 // Números de núcleos / máximo de threads executando funexec's
 #define BUFFER_SIZE 20 // Tamanho do buffer de execuções pendentes
 #define TEMP_SIZE 20 // Tamanho do buffer temporario
-#define mein main // Tentaram me enganar
+#define mein main // Tentaram me enganar (eu queria tanto poder ler esse email algum dia) 
 
 typedef struct {
     int indic;
@@ -34,13 +31,46 @@ int items = 0;
 int first = 0;
 int last = 0; 
 int fios_ativos = 0;
+int proximo = 0; // Usado para gerar os IDs, será sequencial para cada requisição
 // Buffer temporario
 TempElem temp[TEMP_SIZE];
 pthread_mutex_t temp_mutex = PTHREAD_MUTEX_INITIALIZER; // Mutex que controla o acesso ao buffer temporário
 
 // Funções
-int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e argumentos e retorna ID para depois receber resultado
+int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seus argumentos e retorna um ID para depois receber resultado
 {
+    pthread_mutex_lock(&mutex); // Entrando no mutex mutex
+
+    // Espera caso o buffer esteja cheio até que o despachante libere espaço
+    while(items == BUFFER_SIZE) {
+        pthread_cond_wait(&icao, &mutex);
+    }
+
+    // Adicionando a requisição na fila do buffer
+    buffer[last].indic = proximo;
+    buffer[last].funexec = funexec;
+    buffer[last].args = args;
+
+    // Atualizando o índice do buffer
+    last = (last + 1) % BUFFER_SIZE;
+    items++;
+
+    // Inicializando a entrada no buffer temporário
+    pthread_mutex_lock(&temp_mutex);
+    temp[proximo].id = proximo;
+    temp[proximo].finished = 0;
+    temp[proximo].delivered = 0;
+    pthread_cond_init(&temp[proximo].cond_finished, NULL); // Para fazer a pegarResultadoExecucao saber quando o resultado estiver pronto (finished, toma)
+    pthread_mutex_unlock(&temp_mutex);
+
+    pthread_cond_signal(&cond); // Acordando a thread despachante
+
+    // Retornando o ID da requisição
+    int retorno = proximo;
+    proximo ++;
+
+    pthread_mutex_unlock(&mutex); // Saindo do mutex mutex
+    return retorno;
 
 }
 
