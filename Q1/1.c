@@ -1,147 +1,56 @@
-/*
---- API ---
-*/
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 
-#define N 8 // Números de núcleos / máximo de threads executando funexec's
-#define BUFFER_SIZE 20 // Tamanho do buffer de execuções pendentes
-#define TEMP_SIZE 20 // Tamanho do buffer temporario
-#define mein main // Tentaram me enganar (eu queria tanto poder ler esse email algum dia) 
+char palavra[100]; //variavel global contendo a palavra
+int d = 0, e = 0;//variaveis globais onde d contem o numero de arquivos terminados, e controla a quantidade de threads ativas
 
-typedef struct {
-    int indic;
-    int (*funexec)(void *); // Ponteiro para a função 
-    void *args; // Ponteiro para argumentos da função
-} BuffElem;
+void* Procurar(void* search){
+FILE* file; //criando variavel para leitura do arquivo
+file = fopen((char*) search, "r"); 
+int f = 0, i = 0, cond = 0; //f representa a linha atual do arquivo, i representa o indice da palavra, cond representa uma flag para analisar se as letras sao iguais 
+char frase[500]; //variavel para ler as frases de cada linha do arquivo txt
+    
+while(fgets(frase, 500, file) != NULL){ //loop para coletar as linhas do arquivo
+ f++; //a linha atual e atualizada
+ for(int c = 0; c < strlen(frase); c++){ //loop para chegar ate o final da linha passando letra por letra
+      if(frase[c] == palavra[i]){cond = 1;} else{cond = 0;} //se as letras forem iguais, a condicao e 1
+      if(!cond){i = 0;} else{i++;} //se a condicao for 1, o indice i e incrementado, e caso contrario, o indice i e zerado
+      if(i == strlen(palavra)){printf("<%s>:<%d>\n",(char*) search,f); i = 0; cond = 0;} //se a palavra for encontrada, sera printado o nome do arquivo e a linha 
+  }
+}
+d++; e--; //numeros de arquivos finalizados aumenta e numero de threads disponiveis aumenta
+pthread_exit(NULL);
+}
 
-typedef struct {
-    int id;
-    int finished; // FLAG - terminou ou não execução
-    int delivered; // FLAG - recebeu ou não resultado
-    pthread_cond_t cond_finished;
-    int value;
-} TempElem;
-
-pthread_t threads_ativas[N];
-pthread_mutex_t mutex;
-pthread_cond_t cond; //condicao para caso buffer estiver vazio
-pthread_cond_t icao; //condicao para caso buffer estiver cheio 
-// Buffer de execuções pendentes de funções
-BuffElem buffer[BUFFER_SIZE];
-int items = 0;
-long int first = 0;
-int last = 0; 
-int fios_ativos = 0;
-int proximo = 0; // Usado para gerar os IDs, será sequencial para cada requisição
-// Buffer temporario
-TempElem temp[TEMP_SIZE];
-pthread_mutex_t temp_mutex = PTHREAD_MUTEX_INITIALIZER; // Mutex que controla o acesso ao buffer temporário
-
-// Funções
-int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seus argumentos e retorna um ID para depois receber resultado
-{
-    pthread_mutex_lock(&mutex); // Entrando no mutex mutex
-
-    // Espera caso o buffer esteja cheio até que o despachante libere espaço
-    while(items == BUFFER_SIZE) {
-        pthread_cond_wait(&icao, &mutex);
+int main()
+{   int file_number = 0, thread_number = 0, b = 0, c = 0;
+    //coletando variaveis como numero de arquivos, threads e a palavra desejada
+    printf("Defina o numero de arquivos: "); scanf("%d", &file_number);
+    printf("Defina o numero de threads: "); scanf("%d", &thread_number);
+    printf("Palavra: ");  scanf("%s", palavra);
+    //criando matriz de char para coletar os nomes dos arquivos
+    char **nomes = (char**) calloc(file_number, sizeof(char*));
+    for(int a = 0; a < file_number; a++){nomes[a] = (char*) calloc(100, sizeof(char));}
+    for(int a = 0; a < file_number; a++){
+        printf("Diga o nome do %do arquivo: ", a+1); scanf("%s", nomes[a]);
     }
-
-    // Adicionando a requisição na fila do buffer
-    buffer[last].indic = proximo;
-    buffer[last].funexec = funexec;
-    buffer[last].args = args;
-
-    // Atualizando o índice do buffer
-    last = (last + 1) % BUFFER_SIZE;
-    items++;
-
-    // Inicializando a entrada no buffer temporário
-    pthread_mutex_lock(&temp_mutex);
-    temp[proximo].id = proximo;
-    temp[proximo].finished = 0;
-    temp[proximo].delivered = 0;
-    pthread_cond_init(&temp[proximo].cond_finished, NULL); // Para fazer a pegarResultadoExecucao saber quando o resultado estiver pronto (finished, toma)
-    pthread_mutex_unlock(&temp_mutex);
-
-    pthread_cond_signal(&cond); // Acordando a thread despachante
-
-    // Retornando o ID da requisição
-    int retorno = proximo;
-    proximo ++;
-
-    pthread_mutex_unlock(&mutex); // Saindo do mutex mutex
-    return retorno;
-
-}
-
-void* executora(void* args) // Executa a função do usuário e adiciona o resultado no buffer temporario
-{
-    long int idc = (long int) args;
-    int (*funexecs)(void*) = buffer[idc].funexec;
-    // Executa a funcao
-    int res = funexecs(args);
-    // Coloca no buffer temporario
-    temp[idc].value = res;
-    temp[idc].finished = 1;
-    // Acorda a thread esperando pelo resultado (se estiver)
-    pthread_cond_signal(&temp[idc].cond_finished);
-}
-
-void *despachante(void *arg) // Gerencia a criação de threads para executar funções funexec
-{
-   int rc = 0; //variavel para receber a saída do pthread_create
-    while(1){
-        if(fios_ativos < N){
-        pthread_mutex_lock(&mutex); //Entrando no mutex mutex
-        //Caso nao haja funcoes no buffer, sera aguardado a criacao de novas funcoes 
-        while(items == 0){
-        pthread_cond_wait(&cond, &mutex);    
-        }
-        rc = pthread_create(&threads_ativas[fios_ativos], NULL, &executora, (void*) first);
-        if(rc){printf("Erro e o codigo de saida e %d", rc); exit(-1);} //checando se houve erro na thread
-        if(first < BUFFER_SIZE){first++;} //atualiza a variavel first para pegar a proxima funcao
-        else{first = 0;}
-        fios_ativos++; items--; //aumentando o numero de threads ativas e diminuindo o numero de items
-        pthread_cond_signal(&icao); //acordando a agendarExecucao
-        pthread_mutex_unlock(&mutex); //libera o mutex mutex
-        }
-        else{
-            for(int i = 0; i < fios_ativos; i++){ //loop para esperar as threads ativas acabarem
-              pthread_join(threads_ativas[i], NULL);
-            }
-            fios_ativos = 0; //zerando a variavel de fios ativos pois todas as threads acabaram
-        }
-    }  
-}
-
-int pegarResultadoExecucao(int id) // Recebe um id e bloqueia a thread até obter o resultado
-{
-    // Procura o ID no vetor de resultados
-    int retorno;
-    for (int i=0; i<TEMP_SIZE; i++) {
-        if (temp[i].id == id) { // Achou o ID
-            pthread_mutex_lock(&temp_mutex);
-            while (temp[i].finished == 0) { // Dorme até terminar de executar
-                pthread_cond_wait(&temp[i].cond_finished, &temp_mutex);
-            }
-
-            retorno = temp[i].value;
-            temp[i].delivered = 1; // Marca como recebido
-            pthread_cond_destroy(&temp[i].cond_finished); // Libera memória da variável de condição
-            pthread_mutex_unlock(&temp_mutex);
-        
-            return retorno;
+    //threads
+    pthread_t *threads = (pthread_t*) calloc(thread_number, sizeof(pthread_t));
+    if(thread_number > file_number){thread_number = file_number;} //caso haja mais threads disponiveis do que arquivos, os numeros de threads serao iguais ao numero de arquivos
+   while(d < file_number){//loop que terminara somente quando todos arquivos forem lidos
+    for(; (e < thread_number) && (c < file_number); e++){ //loop que sempre ativara quando houver threads disponiveis e arquivos que nao foram analisados
+       b = pthread_create(&threads[e], NULL, Procurar, (void*) nomes[c]); c++; //criando threads para ler arquivos nao lidos e atualizando a variavel c para a proxima thread usar o proximo arquivo
+        if(b){ //checando se houve erro nas threads
+            printf("Erro e o retorno e %d\n", b);
+            exit(-1);
         }
     }
-    return -1; // Se o id recebido existe, nunca chegará aqui.
-}
-
-int mein()
-{
-    printf("Ola mundo!\n");
-
-    return 0;
+   }
+   //liberando memoria
+   for(int a = 0; a < file_number; a++){free(nomes[a]);} 
+   free(nomes);
+   free(threads);
+   pthread_exit(NULL);
 }
