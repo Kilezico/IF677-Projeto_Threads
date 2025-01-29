@@ -53,8 +53,8 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seu
     pthread_mutex_lock(&temp_mutex);
     int ind_disponivel = -1; // Variável pra encontrar um índice disponível
     for(int i = 0; i < TEMP_SIZE; i ++) {
-        if(temp[i].delivered && temp[i].finished) { // Eu não sei se precisa das duas condições mas vou botar por garantia
-            ind_disponivel = i; // Achou!!
+        if(temp[i].delivered) { // Achou!!
+            ind_disponivel = i;
             
             break;
         }
