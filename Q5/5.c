@@ -42,39 +42,62 @@ pthread_mutex_t temp_mutex = PTHREAD_MUTEX_INITIALIZER; // Mutex que controla o 
 // Funções
 int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seus argumentos e retorna um ID para depois receber resultado
 {
-    pthread_mutex_lock(&mutex); // Entrando no mutex mutex
+    pthread_mutex_lock(&mutex); // Entrando no mutex
 
     // Espera caso o buffer esteja cheio até que o despachante libere espaço
     while(items == BUFFER_SIZE) {
         pthread_cond_wait(&icao, &mutex);
     }
 
+    // Inicializando a entrada no buffer temporário
+    pthread_mutex_lock(&temp_mutex);
+    int ind_disponivel = -1; // Variável pra encontrar um índice disponível
+    for(int i = 0; i < TEMP_SIZE; i ++) {
+        if(temp[i].delivered && temp[i].finished) { // Eu não sei se precisa das duas condições mas vou botar por garantia
+            ind_disponivel = i; // Achou!!
+            
+            break;
+        }
+    }
+
+    if(ind_disponivel == -1) { // Não achou...
+        pthread_mutex_unlock(&temp_mutex);
+        pthread_mutex_unlock(&mutex);
+
+        return -1; // Deu bronca
+    }
+
+    int id_unico = proximo ++; // Gerando ID único
+
     // Adicionando a requisição na fila do buffer
-    buffer[last].indic = proximo;
+    buffer[last].indic = ind_disponivel;
     buffer[last].funexec = funexec;
     buffer[last].args = args;
 
     // Atualizando o índice do buffer
-    last = (last + 1) % BUFFER_SIZE;
+    //last = (last + 1) % BUFFER_SIZE;
+    if(last < BUFFER_SIZE - 1) {
+        last ++;
+    }
+
+    else {
+        last = 0;
+    }
+
     items++;
 
-    // Inicializando a entrada no buffer temporário
-    pthread_mutex_lock(&temp_mutex);
-    temp[proximo].id = proximo;
-    temp[proximo].finished = 0;
-    temp[proximo].delivered = 0;
-    pthread_cond_init(&temp[proximo].cond_finished, NULL); // Para fazer a pegarResultadoExecucao saber quando o resultado estiver pronto (finished, toma)
+    // Configurando a entrada no buffer temporário
+    temp[ind_disponivel].id = id_unico;
+    temp[ind_disponivel].finished = 0;
+    temp[ind_disponivel].delivered = 0;
+    pthread_cond_init(&temp[ind_disponivel].cond_finished, NULL); // Para fazer a pegarResultadoExecucao saber quando o resultado estiver pronto (finished, toma)
     pthread_mutex_unlock(&temp_mutex);
 
     pthread_cond_signal(&cond); // Acordando a thread despachante
 
-    // Retornando o ID da requisição
-    int retorno = proximo;
-    proximo ++;
-
-    pthread_mutex_unlock(&mutex); // Saindo do mutex mutex
-    return retorno;
-
+    pthread_mutex_unlock(&mutex); // Saindo do mutex
+    
+    return id_unico; // Retornando o ID da requisição
 }
 
 void* executora(void* args) // Executa a função do usuário e adiciona o resultado no buffer temporario
