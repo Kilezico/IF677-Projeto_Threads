@@ -31,7 +31,7 @@ pthread_cond_t icao; //condicao para caso buffer estiver cheio
 // Buffer de execuções pendentes de funções
 BuffElem buffer[BUFFER_SIZE];
 int items = 0;
-long int first = 0;
+int first = 0;
 int last = 0; 
 int fios_ativos = 0;
 int proximo = 0; // Usado para gerar os IDs, será sequencial para cada requisição
@@ -79,7 +79,7 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seu
 
 void* executora(void* args) // Executa a função do usuário e adiciona o resultado no buffer temporario
 {
-    long int idc = (long int) args;
+    int idc = (int) args;
     int (*funexecs)(void*) = buffer[idc].funexec;
     // Executa a funcao
     int res = funexecs(args);
@@ -92,28 +92,16 @@ void* executora(void* args) // Executa a função do usuário e adiciona o resul
 
 void *despachante(void *arg) // Gerencia a criação de threads para executar funções funexec
 {
-   int rc = 0; //variavel para receber a saída do pthread_create
+   int rc = 0;
     while(1){
-        if(fios_ativos < N){
-        pthread_mutex_lock(&mutex); //Entrando no mutex mutex
-        //Caso nao haja funcoes no buffer, sera aguardado a criacao de novas funcoes 
+        pthread_mutex_lock(&mutex);
         while(items == 0){
         pthread_cond_wait(&cond, &mutex);    
         }
         rc = pthread_create(&threads_ativas[fios_ativos], NULL, &executora, (void*) first);
-        if(rc){printf("Erro e o codigo de saida e %d", rc); exit(-1);} //checando se houve erro na thread
-        if(first < BUFFER_SIZE){first++;} //atualiza a variavel first para pegar a proxima funcao
-        else{first = 0;}
-        fios_ativos++; items--; //aumentando o numero de threads ativas e diminuindo o numero de items
-        pthread_cond_signal(&icao); //acordando a agendarExecucao
-        pthread_mutex_unlock(&mutex); //libera o mutex mutex
-        }
-        else{
-            for(int i = 0; i < fios_ativos; i++){ //loop para esperar as threads ativas acabarem
-              pthread_join(threads_ativas[i], NULL);
-            }
-            fios_ativos = 0; //zerando a variavel de fios ativos pois todas as threads acabaram
-        }
+        
+        
+        pthread_mutex_unlock(&mutex);
     }  
 }
 
