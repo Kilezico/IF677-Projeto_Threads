@@ -138,6 +138,7 @@ void *despachante(void *arg) // Gerencia a criação de threads para executar fu
         if(fios_ativos < N && liberado > -1){
         DuoInt *temp; temp->variavel1 = first; temp->variavel2 = liberado;
         rc = pthread_create(&threads_ativas[liberado], NULL, &executora, (void*) temp);
+        temp = (DuoInt *) calloc(1, sizeof(DuoInt));
         if(rc){printf("Erro e o codigo de saida e %d", rc); exit(-1);} //checando se houve erro na thread
         threads_ocupadas[liberado] = 1; liberado = -1;
         if(first < BUFFER_SIZE){first++;} //atualiza a variavel first para pegar a proxima funcao
