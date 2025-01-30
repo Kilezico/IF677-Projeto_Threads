@@ -10,7 +10,7 @@
 #define TEMP_SIZE 20 // Tamanho do buffer temporario
 
 typedef struct {
-    int indic;
+    int indic; // Indice no buffer temporario referente a esta requisicao
     int (*funexec)(void *); // Ponteiro para a função 
     void *args; // Ponteiro para argumentos da função
 } BuffElem;
@@ -28,18 +28,18 @@ typedef struct {
  int variavel2; // segundo int
 } DuoInt; // struct para passar dois ints para a thread
 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER; // Condição para caso buffer estiver vazio
+pthread_cond_t icao = PTHREAD_COND_INITIALIZER; // Condição para caso buffer estiver cheio
+pthread_cond_t condicionamento = PTHREAD_COND_INITIALIZER; // condicao para indicar que ha um nucleo disponivel
 pthread_t threads_ativas[N];
-pthread_mutex_t mutex;
-pthread_cond_t cond; // Condição para caso buffer estiver vazio
-pthread_cond_t icao; // Condição para caso buffer estiver cheio
-pthread_cond_t condicionamento; // condicao para indicar que ha um nucleo disponivel
+int threads_ocupadas[N];
 // Buffer de execuções pendentes de funções
 BuffElem buffer[BUFFER_SIZE];
 int items = 0;
 long long int first = 0;
 int last = 0; 
 int fios_ativos = 0;
-int threads_ocupadas[N];
 int proximo = 0; // Usado para gerar os IDs, será sequencial para cada requisição
 // Buffer temporario
 TempElem temp[TEMP_SIZE];
@@ -98,7 +98,7 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seu
     pthread_cond_init(&temp[ind_disponivel].cond_finished, NULL); // Para fazer a pegarResultadoExecucao saber quando o resultado estiver pronto (finished, toma)
     pthread_mutex_unlock(&temp_mutex);
 
-    pthread_cond_signal(&cond); // Acordando a thread despachante
+    if (items == 1) pthread_cond_signal(&cond); // Acordando a thread despachante
 
     pthread_mutex_unlock(&mutex); // Saindo do mutex
     
@@ -112,14 +112,15 @@ void* executora(void* args) // Executa a função do usuário e adiciona o resul
     int idc2 = ((DuoInt*) args)->variavel2;
     int (*funexecs)(void*) = buffer[idc].funexec;
     // Executa a funcao
-    int res = funexecs(args);
+    int res = funexecs(buffer[idc].args);
     // Coloca no buffer temporario
-    temp[idc].value = res;
-    temp[idc].finished = 1;
+    int temp_idc = buffer[idc].indic;
+    temp[temp_idc].value = res;
+    temp[temp_idc].finished = 1;
     threads_ocupadas[idc2] = 0;
     fios_ativos--;
     // Acorda a thread esperando pelo resultado (se estiver)
-    pthread_cond_signal(&temp[idc].cond_finished);
+    pthread_cond_signal(&temp[temp_idc].cond_finished);
     // Acorda a despachante caso haja o numero maximo de threads ativas
     pthread_cond_signal(&condicionamento);
 }
@@ -144,15 +145,15 @@ void *despachante(void *arg) // Gerencia a criação de threads para executar fu
             if(liberado > -1){break;}
         }
         if(fios_ativos < N && liberado > -1){
-        DuoInt *temp; temp->variavel1 = first; temp->variavel2 = liberado;
+        DuoInt *temp = (DuoInt *) calloc(1, sizeof(DuoInt));
+        temp->variavel1 = first; temp->variavel2 = liberado;
         rc = pthread_create(&threads_ativas[liberado], NULL, &executora, (void*) temp);
-        temp = (DuoInt *) calloc(1, sizeof(DuoInt));
         if(rc){printf("Erro e o codigo de saida e %d", rc); exit(-1);} //checando se houve erro na thread
         threads_ocupadas[liberado] = 1; liberado = -1;
-        if(first < BUFFER_SIZE){first++;} //atualiza a variavel first para pegar a proxima funcao
+        if(first < BUFFER_SIZE-1){first++;} //atualiza a variavel first para pegar a proxima funcao
         else{first = 0;}
         fios_ativos++; items--; //aumentando o numero de threads ativas e diminuindo o numero de items
-        pthread_cond_signal(&icao); //acordando a agendarExecucao
+        if (items == BUFFER_SIZE-1) pthread_cond_signal(&icao); //acordando a agendarExecucao
         }
         pthread_mutex_unlock(&mutex); //libera o mutex mutex
         
@@ -163,9 +164,9 @@ int pegarResultadoExecucao(int id) // Recebe um id e bloqueia a thread até obte
 {
     // Procura o ID no vetor de resultados
     int retorno;
+    pthread_mutex_lock(&temp_mutex);
     for (int i=0; i<TEMP_SIZE; i++) {
         if (temp[i].id == id) { // Achou o ID
-            pthread_mutex_lock(&temp_mutex);
             while (temp[i].finished == 0) { // Dorme até terminar de executar
                 pthread_cond_wait(&temp[i].cond_finished, &temp_mutex);
             }
@@ -173,17 +174,12 @@ int pegarResultadoExecucao(int id) // Recebe um id e bloqueia a thread até obte
             retorno = temp[i].value;
             temp[i].delivered = 1; // Marca como recebido
             pthread_cond_destroy(&temp[i].cond_finished); // Libera memória da variável de condição
-            pthread_mutex_unlock(&temp_mutex);
         
             return retorno;
         }
     }
+    pthread_mutex_unlock(&temp_mutex);
     return -1; // Se o id recebido existe, nunca chegará aqui.
-}
-
-int funexec(void *args) { // Função de exemplo apenas para ter algo para agendar na main
-    int *valor = (int *) args; // A função receberá o endereço de memória, precisamos passar pra int para poder fazer a soma!
-    return *valor + 1000; // Soma mil
 }
 
 void initAPI() // Inicialização das coisas da API
@@ -196,6 +192,11 @@ void initAPI() // Inicialização das coisas da API
     for (int i=0; i<TEMP_SIZE; i++) {
         temp[i].delivered = 1;
     }
+}
+
+int funexec(void *args) { // Função de exemplo apenas para ter algo para agendar na main
+    int *valor = (int *) args; // A função receberá o endereço de memória, precisamos passar pra int para poder fazer a soma!
+    return *valor + 1000; // Soma mil
 }
 
 int main()
