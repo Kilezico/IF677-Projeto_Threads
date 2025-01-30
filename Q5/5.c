@@ -110,19 +110,28 @@ void* executora(void* args) // Executa a função do usuário e adiciona o resul
     int temp_idc = buffer[first].indic;
     if(first < BUFFER_SIZE-1){first++;} //atualiza a variavel first para pegar a proxima funcao
     else{first = 0;}
-    pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&mutex); // Destrava o mutex para executar a funexec (que pode ser longa)
+    
     // Executa a funcao
     int res = funexecs(argumentostemporarios);
+
+    pthread_mutex_lock(&temp_mutex);
     // Coloca no buffer temporario
     temp[temp_idc].value = res;
     temp[temp_idc].finished = 1;
+    // Acorda a thread esperando pelo resultado (se estiver)
+    pthread_cond_signal(&temp[temp_idc].cond_finished);
+    pthread_mutex_unlock(&temp_mutex);
+
+    pthread_mutex_lock(&mutex);
     //atualiza a desocupacao do array de threads desocupadas e a quantidade de threads disponiveis aumenta
     threads_ocupadas[idc] = 0;
     fios_ativos--;
-    // Acorda a thread esperando pelo resultado (se estiver)
-    pthread_cond_signal(&temp[temp_idc].cond_finished);
-    // Acorda a despachante caso haja o numero maximo de threads ativas
-    pthread_cond_signal(&condicionamento);
+    // Acorda a despachante caso tinha o numero maximo de threads ativas
+    if (fios_ativos == N - 1 ) pthread_cond_signal(&condicionamento);
+    pthread_mutex_unlock(&mutex);
+
+    pthread_exit(NULL);
 }
 
 void *despachante(void *arg) // Gerencia a criação de threads para executar funções funexec
@@ -153,8 +162,8 @@ void *despachante(void *arg) // Gerencia a criação de threads para executar fu
         if (items == BUFFER_SIZE-1) pthread_cond_signal(&icao); //acordando a agendarExecucao
         }
         pthread_mutex_unlock(&mutex); //libera o mutex mutex
-        
     }  
+    pthread_exit(NULL);
 }
 
 int pegarResultadoExecucao(int id) // Recebe um id e bloqueia a thread até obter o resultado
