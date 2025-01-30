@@ -65,7 +65,7 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seu
         pthread_mutex_unlock(&temp_mutex);
         pthread_mutex_unlock(&mutex);
 
-        return -1; // Deu bronca
+        return -1; // Não há espaço no buffer para agendar esta requisição
     }
 
     int id_unico = proximo ++; // Gerando ID único
@@ -128,7 +128,7 @@ void* executora(void* args) // Executa a função do usuário e adiciona o resul
     threads_ocupadas[idc] = 0;
     fios_ativos--;
     // Acorda a despachante caso tinha o numero maximo de threads ativas
-    if (fios_ativos == N - 1 ) pthread_cond_signal(&condicionamento);
+    if (fios_ativos == N - 1) pthread_cond_signal(&condicionamento);
     pthread_mutex_unlock(&mutex);
 
     pthread_exit(NULL);
@@ -213,11 +213,11 @@ int main()
     printf("Bem vindo à API da questão 5!\n\n");
     initAPI();
 
-    int valores[5] = {0, 1, 2, 3, 4};
-    int ids[5];
-    int resultados[5];
+    int valores[23] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22};
+    int ids[23];
+    int resultados[23];
 
-    for(int i = 0; i < 5; i ++) {
+    for(int i = 0; i < 23; i ++) {
         ids[i] = agendarExecucao(funexec, &valores[i]); // Agendando as funções
         if(ids[i] == -1) {
             printf("Erro ao agendar a execução!\n");
@@ -228,10 +228,17 @@ int main()
         }
     }
 
-    for(int i = 0; i < 5; i ++) { // Buscando o resultado das execuções
+    int erro = 0; //Variável para contar quantas requisições não foram agendadas
+    for(int i = 0; i < 23; i ++) { // Buscando o resultado das execuções
         resultados[i] = pegarResultadoExecucao(ids[i]);
-        printf("Resultado da soma: %d\n", resultados[i]);
+        if(resultados[i] >= 0) { // Houve espaço no buffer temporário para agendar a requisição
+            printf("Resultado da soma: %d\n", resultados[i]);
+        }
+        else { // Caso o resultado seja -1, não houve espaço no buffer
+            erro ++;
+        }
     }
+    printf("%d requisções não puderam ser agendadas!\n", erro);
 
     return 0;
 }
