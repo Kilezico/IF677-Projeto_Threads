@@ -74,5 +74,6 @@ int main()
    //liberando memoria
    for(int a = 0; a < file_number; a++){free(nomes[a]);} 
    free(nomes);
+   pthread_mutex_destroy(&mutex);
    pthread_exit(NULL);
 }
