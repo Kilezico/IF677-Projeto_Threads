@@ -24,6 +24,11 @@ typedef struct {
     int value;
 } TempElem;
 
+typedef struct {
+ int variavel1; // primeiro int
+ int variavel2; // segundo int
+} DuoInt; //struct para passar dois ints para a thread
+
 pthread_t threads_ativas[N];
 pthread_mutex_t mutex;
 pthread_cond_t cond; //condicao para caso buffer estiver vazio
@@ -31,9 +36,10 @@ pthread_cond_t icao; //condicao para caso buffer estiver cheio
 // Buffer de execuções pendentes de funções
 BuffElem buffer[BUFFER_SIZE];
 int items = 0;
-long int first = 0;
+long long int first = 0;
 int last = 0; 
 int fios_ativos = 0;
+int threads_ocupadas[N];
 int proximo = 0; // Usado para gerar os IDs, será sequencial para cada requisição
 // Buffer temporario
 TempElem temp[TEMP_SIZE];
@@ -102,41 +108,47 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seu
 
 void* executora(void* args) // Executa a função do usuário e adiciona o resultado no buffer temporario
 {
-    long int idc = (long int) args;
+    int idc = ((DuoInt*) args)->variavel1;
+    int idc2 = ((DuoInt*) args)->variavel2;
     int (*funexecs)(void*) = buffer[idc].funexec;
     // Executa a funcao
     int res = funexecs(args);
     // Coloca no buffer temporario
     temp[idc].value = res;
     temp[idc].finished = 1;
+    threads_ocupadas[idc2] = 0;
+    fios_ativos--;
     // Acorda a thread esperando pelo resultado (se estiver)
     pthread_cond_signal(&temp[idc].cond_finished);
 }
 
 void *despachante(void *arg) // Gerencia a criação de threads para executar funções funexec
 {
-   int rc = 0; //variavel para receber a saída do pthread_create
+   int rc = 0, liberado = -1;//variavel rc para receber a saída do pthread_create e liberado para coletar o indice da thread disponivel
+   for(int a = 0; a < N; a++){threads_ocupadas[a] = 0;}
     while(1){
-        if(fios_ativos < N){
         pthread_mutex_lock(&mutex); //Entrando no mutex mutex
         //Caso nao haja funcoes no buffer, sera aguardado a criacao de novas funcoes 
         while(items == 0){
         pthread_cond_wait(&cond, &mutex);    
         }
-        rc = pthread_create(&threads_ativas[fios_ativos], NULL, &executora, (void*) first);
+        //loop para verificar se ha indices em que nao ha threads ativas
+        for(int a = 0; a < N; a++){
+            if(threads_ocupadas[a] == 0){liberado = a;}
+            if(liberado > -1){break;}
+        }
+        if(fios_ativos < N && liberado > -1){
+        DuoInt *temp; temp->variavel1 = first; temp->variavel2 = liberado;
+        rc = pthread_create(&threads_ativas[liberado], NULL, &executora, (void*) temp);
         if(rc){printf("Erro e o codigo de saida e %d", rc); exit(-1);} //checando se houve erro na thread
+        threads_ocupadas[liberado] = 1; liberado = -1;
         if(first < BUFFER_SIZE){first++;} //atualiza a variavel first para pegar a proxima funcao
         else{first = 0;}
         fios_ativos++; items--; //aumentando o numero de threads ativas e diminuindo o numero de items
         pthread_cond_signal(&icao); //acordando a agendarExecucao
+        }
         pthread_mutex_unlock(&mutex); //libera o mutex mutex
-        }
-        else{
-            for(int i = 0; i < fios_ativos; i++){ //loop para esperar as threads ativas acabarem
-              pthread_join(threads_ativas[i], NULL);
-            }
-            fios_ativos = 0; //zerando a variavel de fios ativos pois todas as threads acabaram
-        }
+        
     }  
 }
 
