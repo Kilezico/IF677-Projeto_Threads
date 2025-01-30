@@ -31,10 +31,10 @@ pthread_t threads_ativas[N];
 int threads_ocupadas[N];
 // Buffer de execuções pendentes de funções
 BuffElem buffer[BUFFER_SIZE];
-int items = 0;
-long long int first = 0;
-int last = 0; 
-int fios_ativos = 0;
+int items = 0; //numero de funcoes que faltam ser postas a ser executadas
+long long int first = 0; //variavel que indica o proximo indice a ser executado
+int last = 0; //variavel que indica o ultimo indice presente no buffer
+int fios_ativos = 0; //variavel que indica o numero de threads que estao sendo executadas
 int proximo = 0; // Usado para gerar os IDs, será sequencial para cada requisição
 // Buffer temporario
 TempElem temp[TEMP_SIZE];
@@ -104,7 +104,7 @@ void* executora(void* args) // Executa a função do usuário e adiciona o resul
 {
     //passando os valores
     long long int idc = (long long int) args;
-    pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&mutex); //trava o mutex para acessar o buffer
     int (*funexecs)(void*) = buffer[first].funexec;
     void* argumentostemporarios = buffer[first].args;
     int temp_idc = buffer[first].indic;
