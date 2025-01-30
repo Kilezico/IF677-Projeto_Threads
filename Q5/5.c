@@ -23,11 +23,6 @@ typedef struct {
     int value;
 } TempElem;
 
-typedef struct {
- int variavel1; // primeiro int
- int variavel2; // segundo int
-} DuoInt; // struct para passar dois ints para a thread
-
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER; // Condição para caso buffer estiver vazio
 pthread_cond_t icao = PTHREAD_COND_INITIALIZER; // Condição para caso buffer estiver cheio
@@ -108,16 +103,18 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seu
 void* executora(void* args) // Executa a função do usuário e adiciona o resultado no buffer temporario
 {
     //passando os valores
-    int idc = ((DuoInt*) args)->variavel1;
-    int idc2 = ((DuoInt*) args)->variavel2;
-    int (*funexecs)(void*) = buffer[idc].funexec;
+    long long int idc = (long long int) args; 
+    int (*funexecs)(void*) = buffer[first].funexec;
     // Executa a funcao
-    int res = funexecs(buffer[idc].args);
+    int res = funexecs(buffer[first].args);
     // Coloca no buffer temporario
-    int temp_idc = buffer[idc].indic;
+    int temp_idc = buffer[first].indic;
     temp[temp_idc].value = res;
     temp[temp_idc].finished = 1;
-    threads_ocupadas[idc2] = 0;
+    if(first < BUFFER_SIZE-1){first++;} //atualiza a variavel first para pegar a proxima funcao
+    else{first = 0;}
+    //atualiza a desocupacao do array de threads desocupadas e a quantidade de threads disponiveis aumenta
+    threads_ocupadas[idc] = 0;
     fios_ativos--;
     // Acorda a thread esperando pelo resultado (se estiver)
     pthread_cond_signal(&temp[temp_idc].cond_finished);
@@ -145,13 +142,10 @@ void *despachante(void *arg) // Gerencia a criação de threads para executar fu
             if(liberado > -1){break;}
         }
         if(fios_ativos < N && liberado > -1){
-        DuoInt *temp = (DuoInt *) calloc(1, sizeof(DuoInt));
-        temp->variavel1 = first; temp->variavel2 = liberado;
+        long long int temp = liberado; //criando variavel temporaria para copiar o valor de liberado
         rc = pthread_create(&threads_ativas[liberado], NULL, &executora, (void*) temp);
         if(rc){printf("Erro e o codigo de saida e %d", rc); exit(-1);} //checando se houve erro na thread
-        threads_ocupadas[liberado] = 1; liberado = -1;
-        if(first < BUFFER_SIZE-1){first++;} //atualiza a variavel first para pegar a proxima funcao
-        else{first = 0;}
+        threads_ocupadas[liberado] = 1; liberado = -1; //atualizando o indice de thread_ocupadas e retornando o valor de liberado para -1
         fios_ativos++; items--; //aumentando o numero de threads ativas e diminuindo o numero de items
         if (items == BUFFER_SIZE-1) pthread_cond_signal(&icao); //acordando a agendarExecucao
         }
@@ -162,9 +156,9 @@ void *despachante(void *arg) // Gerencia a criação de threads para executar fu
 
 int pegarResultadoExecucao(int id) // Recebe um id e bloqueia a thread até obter o resultado
 {
+    pthread_mutex_lock(&temp_mutex);
     // Procura o ID no vetor de resultados
     int retorno;
-    pthread_mutex_lock(&temp_mutex);
     for (int i=0; i<TEMP_SIZE; i++) {
         if (temp[i].id == id) { // Achou o ID
             while (temp[i].finished == 0) { // Dorme até terminar de executar
@@ -175,11 +169,14 @@ int pegarResultadoExecucao(int id) // Recebe um id e bloqueia a thread até obte
             temp[i].delivered = 1; // Marca como recebido
             pthread_cond_destroy(&temp[i].cond_finished); // Libera memória da variável de condição
         
+            pthread_mutex_unlock(&temp_mutex);
             return retorno;
         }
     }
+
+    // Se id for um id que existe, nunca chegará aqui.
     pthread_mutex_unlock(&temp_mutex);
-    return -1; // Se o id recebido existe, nunca chegará aqui.
+    return -1; 
 }
 
 void initAPI() // Inicialização das coisas da API
