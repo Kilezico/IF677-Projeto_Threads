@@ -95,9 +95,9 @@ int main() {
     // quantidade total de threads a serem processadas pelo programa
     total_carros = 2 * N;
 
-    // inicializando os arrays de threads
-    pthread_t threads_norte[N];
-    pthread_t threads_sul[N];
+    // inicializando os arrays de threads com alocação dinâmica
+    pthread_t *threads_norte = (pthread_t *) malloc(N * sizeof(pthread_t));
+    pthread_t *threads_sul = (pthread_t *) malloc(N * sizeof(pthread_t));
 
     for (int i = 0; i < N; i++) {
         // cria as threads que representam os carros do sentido norte, estabelecendo sua rotina, atributos e argumentos passados para a funcao que representa sua rotina
