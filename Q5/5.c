@@ -162,9 +162,22 @@ int pegarResultadoExecucao(int id) // Recebe um id e bloqueia a thread até obte
     return -1; // Se o id recebido existe, nunca chegará aqui.
 }
 
+void initAPI() // Inicialização das coisas da API
+{
+    // Inicia a thread despachante
+    pthread_t despachante_id;
+    pthread_create(&despachante_id, NULL, despachante, NULL);
+
+    // Inicia o vetor temporário como disponível
+    for (int i=0; i<TEMP_SIZE; i++) {
+        temp[i].delivered = 1;
+    }
+}
+
 int mein()
 {
     printf("Ola mundo!\n");
+    initAPI();
 
     return 0;
 }
