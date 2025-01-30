@@ -8,7 +8,6 @@
 #define N 8 // Números de núcleos / máximo de threads executando funexec's
 #define BUFFER_SIZE 20 // Tamanho do buffer de execuções pendentes
 #define TEMP_SIZE 20 // Tamanho do buffer temporario
-#define mein main // Tentaram me enganar (eu queria tanto poder ler esse email algum dia) 
 
 typedef struct {
     int indic;
@@ -27,12 +26,12 @@ typedef struct {
 typedef struct {
  int variavel1; // primeiro int
  int variavel2; // segundo int
-} DuoInt; //struct para passar dois ints para a thread
+} DuoInt; // struct para passar dois ints para a thread
 
 pthread_t threads_ativas[N];
 pthread_mutex_t mutex;
-pthread_cond_t cond; //condicao para caso buffer estiver vazio
-pthread_cond_t icao; //condicao para caso buffer estiver cheio 
+pthread_cond_t cond; // Condição para caso buffer estiver vazio
+pthread_cond_t icao; // Condição para caso buffer estiver cheio 
 // Buffer de execuções pendentes de funções
 BuffElem buffer[BUFFER_SIZE];
 int items = 0;
@@ -81,7 +80,6 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seu
     buffer[last].args = args;
 
     // Atualizando o índice do buffer
-    //last = (last + 1) % BUFFER_SIZE;
     if(last < BUFFER_SIZE - 1) {
         last ++;
     }
@@ -174,6 +172,11 @@ int pegarResultadoExecucao(int id) // Recebe um id e bloqueia a thread até obte
     return -1; // Se o id recebido existe, nunca chegará aqui.
 }
 
+int funexec(void *args) { // Função de exemplo apenas para ter algo para agendar na main
+    int *valor = (int *) args; // A função receberá o endereço de memória, precisamos passar pra int para poder fazer a soma!
+    return *valor + 1000; // Soma mil
+}
+
 void initAPI() // Inicialização das coisas da API
 {
     // Inicia a thread despachante
@@ -186,10 +189,30 @@ void initAPI() // Inicialização das coisas da API
     }
 }
 
-int mein()
+int main()
 {
-    printf("Ola mundo!\n");
+    printf("Bem vindo à API da questão 5!\n\n");
     initAPI();
+
+    int valores[5] = {0, 1, 2, 3, 4};
+    int ids[5];
+    int resultados[5];
+
+    for(int i = 0; i < 5; i ++) {
+        ids[i] = agendarExecucao(funexec, &valores[i]); // Agendando as funções
+        if(ids[i] == -1) {
+            printf("Erro ao agendar a execução!\n");
+        }
+        
+        else {
+            printf("A função de ID %d foi agendada!\n", ids[i]);
+        }
+    }
+
+    for(int i = 0; i < 5; i ++) { // Buscando o resultado das execuções
+        resultados[i] = pegarResultadoExecucao(ids[i]);
+        printf("Resultado da soma: %d\n", resultados[i]);
+    }
 
     return 0;
 }
