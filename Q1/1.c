@@ -13,6 +13,7 @@ typedef struct{
 char palavra[100]; //variavel global contendo a palavra
 int d = 0, e = 0;//variaveis globais onde d contem o numero de arquivos terminados, e controla a quantidade de threads ativas
 pthread_t threads[thread_number]; //array contendo o numero de threads
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; //mutex para a regiao critica
 int threads_ocupadas[thread_number]; //array de ints para dizer quais threads estao disponiveis
 
 void* Procurar(void* search){
@@ -30,7 +31,10 @@ while(fgets(frase, 500, file) != NULL){ //loop para coletar as linhas do arquivo
       if(i == strlen(palavra)){printf("<%s>:<%d>\n",(char*) search,f); i = 0; cond = 0;} //se a palavra for encontrada, sera printado o nome do arquivo e a linha 
   }
 }
-d++; e--; threads_ocupadas[indicado] = 0; //numeros de arquivos finalizados aumenta e numero de threads disponiveis aumenta, e um espaco e desocupado do array de threads
+d++; threads_ocupadas[indicado] = 0; //numeros de arquivos finalizados aumenta, e um espaco e desocupado do array de threads
+pthread_mutex_lock(&mutex); //travando
+e--; //numero de threads disponiveis aumenta
+pthread_mutex_unlock(&mutex); //destravando
 pthread_exit(NULL);
 }
 
@@ -60,7 +64,10 @@ int main()
             printf("Erro e o retorno e %d\n", b);
             exit(-1);
         }
-        threads_ocupadas[liberado] = 1; liberado = -1; e++; //atualizando variaveis para a proxima iteracao do loop
+        threads_ocupadas[liberado] = 1; liberado = -1; //atualizando variaveis para a proxima iteracao do loop
+        pthread_mutex_lock(&mutex); //travando 
+        e++; //atualizando o numero de threads disponiveis
+        pthread_mutex_unlock(&mutex); //destravando
      }
     
    }
