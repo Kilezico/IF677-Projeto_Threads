@@ -31,7 +31,8 @@ typedef struct {
 pthread_t threads_ativas[N];
 pthread_mutex_t mutex;
 pthread_cond_t cond; // Condição para caso buffer estiver vazio
-pthread_cond_t icao; // Condição para caso buffer estiver cheio 
+pthread_cond_t icao; // Condição para caso buffer estiver cheio
+pthread_cond_t condicionamento; // condicao para indicar que ha um nucleo disponivel
 // Buffer de execuções pendentes de funções
 BuffElem buffer[BUFFER_SIZE];
 int items = 0;
@@ -106,6 +107,7 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seu
 
 void* executora(void* args) // Executa a função do usuário e adiciona o resultado no buffer temporario
 {
+    //passando os valores
     int idc = ((DuoInt*) args)->variavel1;
     int idc2 = ((DuoInt*) args)->variavel2;
     int (*funexecs)(void*) = buffer[idc].funexec;
@@ -118,6 +120,8 @@ void* executora(void* args) // Executa a função do usuário e adiciona o resul
     fios_ativos--;
     // Acorda a thread esperando pelo resultado (se estiver)
     pthread_cond_signal(&temp[idc].cond_finished);
+    // Acorda a despachante caso haja o numero maximo de threads ativas
+    pthread_cond_signal(&condicionamento);
 }
 
 void *despachante(void *arg) // Gerencia a criação de threads para executar funções funexec
@@ -129,6 +133,10 @@ void *despachante(void *arg) // Gerencia a criação de threads para executar fu
         //Caso nao haja funcoes no buffer, sera aguardado a criacao de novas funcoes 
         while(items == 0){
         pthread_cond_wait(&cond, &mutex);    
+        }
+        //caso haja o numero maximo de threads ativas, sera aguardado ate que libere um nucleo
+        while(fios_ativos == N){
+        pthread_cond_wait(&condicionamento, &mutex);
         }
         //loop para verificar se ha indices em que nao ha threads ativas
         for(int a = 0; a < N; a++){
