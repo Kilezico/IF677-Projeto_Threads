@@ -103,16 +103,19 @@ int agendarExecucao(int (*funexec)(void *), void *args) // Recebe função e seu
 void* executora(void* args) // Executa a função do usuário e adiciona o resultado no buffer temporario
 {
     //passando os valores
-    long long int idc = (long long int) args; 
+    long long int idc = (long long int) args;
+    pthread_mutex_lock(&mutex);
     int (*funexecs)(void*) = buffer[first].funexec;
-    // Executa a funcao
-    int res = funexecs(buffer[first].args);
-    // Coloca no buffer temporario
+    void* argumentostemporarios = buffer[first].args;
     int temp_idc = buffer[first].indic;
-    temp[temp_idc].value = res;
-    temp[temp_idc].finished = 1;
     if(first < BUFFER_SIZE-1){first++;} //atualiza a variavel first para pegar a proxima funcao
     else{first = 0;}
+    pthread_mutex_unlock(&mutex);
+    // Executa a funcao
+    int res = funexecs(argumentostemporarios);
+    // Coloca no buffer temporario
+    temp[temp_idc].value = res;
+    temp[temp_idc].finished = 1;
     //atualiza a desocupacao do array de threads desocupadas e a quantidade de threads disponiveis aumenta
     threads_ocupadas[idc] = 0;
     fios_ativos--;
