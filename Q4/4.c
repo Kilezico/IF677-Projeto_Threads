@@ -25,8 +25,8 @@ typedef struct thread_args {
 
 // Funções
 BlockingQueue *newBlockingQueue(unsigned int SizeBuffer);
-void putBlockingQueue(BlockingQueue *Q, int newValue, int id);
-int takeBlockingQueue(BlockingQueue *Q, int id);
+void putBlockingQueue(BlockingQueue *Q, int newValue, int id); // Parâmetro id serve apenas para o print
+int takeBlockingQueue(BlockingQueue *Q, int id); // Aqui também. Parâmetro id só para o print
 
 pthread_mutex_t mutexLegal = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cheia = PTHREAD_COND_INITIALIZER;
